@@ -1,0 +1,15 @@
+2026-07-04 00:52:01 CEST
+=== Token accounting (Issue #6) ===
+
+Sequence: 500, 500, 200
+  server-reported prompt_tokens : 42
+  returned  prompt_tokens       : 42
+  (old buggy code would report  : 52)
+  billable NOT inflated by retries: PASS
+
+{"timestamp": "2026-07-04 00:52:02,053", "level": "WARNING", "name": "agent-service", "message": "llm call exhausted retries", "trace_id": "", "span_id": "", "stage": "probe", "last_status": 500, "last_error": "LLM returned 500", "attempts": 5, "total_backoff_s": 8.0, "wasted_tokens": 25}
+Sequence: 500 x5 (total failure)
+  returned prompt_tokens        : 0 (expected 0)
+  failed call bills 0 tokens     : PASS
+
+RESULT: ALL PASS

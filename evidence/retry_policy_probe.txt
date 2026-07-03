@@ -1,0 +1,27 @@
+2026-07-04 00:42:37 CEST
+=== Retry policy (Issue #5) ===
+
+Config:
+  RETRY_MAX_ATTEMPTS (500/timeout) = 5
+  RETRY_MAX_ATTEMPTS_RATE_LIMIT (429) = 3
+  RETRY_BASE_DELAY (500) = 0.5s
+  RETRY_RATE_LIMIT_BASE_DELAY (429) = 2.0s
+  RETRY_TOTAL_BACKOFF_BUDGET = 8.0s
+
+Retry-After header honoured:
+  'Retry-After: 5'  -> 5.0s
+  (missing)         -> None
+  'Retry-After: xx' -> None
+
+Mean backoff delay by class (jitter-averaged):
+ attempt |  500/timeout |  429 (no RA)
+       0 |        0.58s |        2.30s
+       1 |        1.15s |        4.60s
+       2 |        2.30s |        9.23s
+
+429 with Retry-After=5s -> mean delay 5.74s (honours header, ignores exponential schedule)
+
+Worst-case cumulative backoff for a 500 storm:
+  OLD (uniform, 5 attempts, uncapped) = 7.50s
+  NEW (budget-capped)                 = 8.00s
+  → a single call can no longer burn >8s of the 30s task deadline in backoff alone.

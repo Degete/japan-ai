@@ -15,6 +15,7 @@ Observability (added):
 
 import time
 import traceback
+from collections import deque
 
 from opentelemetry import trace
 
@@ -25,6 +26,8 @@ from src.config import (
     LLM_SERVER_URL,
     TOKEN_COST_PER_1K_INPUT,
     TOKEN_COST_PER_1K_OUTPUT,
+    ENABLE_VALIDATION_STAGE,
+    EXECUTION_LOG_MAX_ENTRIES,
 )
 from src.telemetry import (
     log,
@@ -36,8 +39,8 @@ from src.telemetry import (
 
 _tracer = get_tracer()
 
-# Execution audit trail for debugging and compliance review
-_execution_log: list[dict] = []
+# Execution audit trail for debugging and compliance review.
+_execution_log: deque[dict] = deque(maxlen=EXECUTION_LOG_MAX_ENTRIES)
 
 
 def execution_log_size() -> int:
@@ -145,26 +148,29 @@ async def run_task(task_id: str, description: str,
                 created_at=created, completed_at=time.time(),
             )
 
-        # ── Step 4: Quality validation ─────────────────────
+        # ── Step 4: Quality validation (optional) ──────────
         # Enterprise quality gate: validate LLM output meets
         # accuracy and compliance standards before returning to tenant
-        with _tracer.start_as_current_span("stage.validate") as span:
-            span.set_attribute("stage", "validate")
-            _t0 = time.perf_counter()
-            validation = await call_llm(
-                prompt=(
-                    f"Rate the quality of this response (1-10) and flag "
-                    f"any factual errors or compliance issues:\n\n"
-                    f"{summary.get('text', '')}"
-                ),
-                max_tokens=128,
-                stage="validate",
-            )
-            STAGE_DURATION.labels("validate", tenant_id, prio).observe(
-                time.perf_counter() - _t0
-            )
-        total_prompt_tokens += validation.get("prompt_tokens", 0)
-        total_completion_tokens += validation.get("completion_tokens", 0)
+        quality_score = ""
+        if ENABLE_VALIDATION_STAGE:
+            with _tracer.start_as_current_span("stage.validate") as span:
+                span.set_attribute("stage", "validate")
+                _t0 = time.perf_counter()
+                validation = await call_llm(
+                    prompt=(
+                        f"Rate the quality of this response (1-10) and flag "
+                        f"any factual errors or compliance issues:\n\n"
+                        f"{summary.get('text', '')}"
+                    ),
+                    max_tokens=128,
+                    stage="validate",
+                )
+                STAGE_DURATION.labels("validate", tenant_id, prio).observe(
+                    time.perf_counter() - _t0
+                )
+            total_prompt_tokens += validation.get("prompt_tokens", 0)
+            total_completion_tokens += validation.get("completion_tokens", 0)
+            quality_score = validation.get("text", "")
 
         # Record execution details for audit trail
         _execution_log.append({
@@ -176,7 +182,7 @@ async def run_task(task_id: str, description: str,
             "tool_results": tool_results,
             "summary_prompt": summary_prompt,
             "summary_response": summary,
-            "quality_score": validation.get("text", ""),
+            "quality_score": quality_score,
             "token_usage": {"prompt": total_prompt_tokens,
                             "completion": total_completion_tokens},
             "completed_at": time.time(),

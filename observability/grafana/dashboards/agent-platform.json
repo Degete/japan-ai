@@ -133,9 +133,20 @@
       ]
     },
     {
+      "type": "timeseries",
+      "title": "Admission Queue Depth by Priority (priority scheduling)",
+      "description": "Tasks waiting in the priority admission gate. Under saturation, urgent should drain first and low should back up — proving priority is honoured.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 15, "stacking": { "mode": "none" } } } },
+      "targets": [
+        { "expr": "agent_admission_queue_depth", "legendFormat": "{{priority}}" }
+      ]
+    },
+    {
       "type": "row",
       "title": "Pipeline Stages & LLM",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
     },
     {
       "type": "timeseries",
@@ -169,12 +180,13 @@
     },
     {
       "type": "timeseries",
-      "title": "LLM Rate-Limiter Wait p95",
+      "title": "Retry Backoff — avg sleep per retry by reason (429 backs off harder)",
+      "description": "Mean backoff sleep per retry attempt, by failure class. Issue #5: 429 (rate limited) should sit well above 500 — the client backs off harder on an already-overloaded LLM instead of hammering it.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "fieldConfig": { "defaults": { "unit": "s" } },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_llm_rate_limit_wait_seconds_bucket[5m])))", "legendFormat": "p95 wait" }
+        { "expr": "sum by (reason) (rate(agent_llm_retry_backoff_seconds_sum[5m])) / clamp_min(sum by (reason) (rate(agent_llm_retry_backoff_seconds_count[5m])), 0.0001)", "legendFormat": "{{reason}}" }
       ]
     },
     {
@@ -206,10 +218,24 @@
       "type": "timeseries",
       "title": "In-Memory Store Sizes (unbounded-growth watch)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "targets": [
         { "expr": "agent_store_entries", "legendFormat": "{{store}}" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Billable vs Wasted Tokens (retry waste split out)",
+      "description": "Issue #6: tokens burned on failed LLM attempts are counted as 'wasted' and are NOT folded into billable prompt tokens / cost. Wasted tokens are still visible here for retry-cost FinOps.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [
+        { "expr": "sum(agent_tokens_total{kind=\"prompt\"})", "legendFormat": "billable prompt tokens" },
+        { "expr": "sum(agent_tokens_total{kind=\"completion\"})", "legendFormat": "billable completion tokens" },
+        { "expr": "sum(agent_wasted_tokens_total)", "legendFormat": "wasted (retry) tokens" }
       ]
     }
   ]

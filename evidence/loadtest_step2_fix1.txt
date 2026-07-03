@@ -1,0 +1,118 @@
+2026-07-03 18:32:41 CEST
+LOAD_START_EPOCH=1783096361
+[007] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 150, 'completion_tokens': 430}  1.57s
+[000] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 164, 'completion_tokens': 387}  2.04s
+[005] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 191, 'completion_tokens': 616}  2.36s
+[013] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 172, 'completion_tokens': 670}  2.42s
+[004] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 592}  3.81s
+[008] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 494}  4.52s
+[002] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 230, 'completion_tokens': 401}  4.55s
+[011] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 523}  4.86s
+[003] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 706}  4.96s
+[023] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[006] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 342}  5.97s
+[025] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[014] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 435}  6.24s
+[009] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 336}  6.72s
+[010] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 190, 'completion_tokens': 434}  7.35s
+[001] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 150, 'completion_tokens': 850}  7.53s
+[012] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 570}  7.95s
+[031] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[017] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 283}  6.02s
+[018] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 442}  7.30s
+[016] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 269}  8.18s
+[020] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 191, 'completion_tokens': 447}  6.16s
+[019] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 416}  6.90s
+[026] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 475}  6.13s
+[021] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 298}  7.61s
+[022] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 315}  7.48s
+[024] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 745}  7.96s
+[027] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 548}  8.10s
+[029] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 405}  7.14s
+[028] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 643}  7.94s
+[032] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 404}  7.78s
+[015] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 150, 'completion_tokens': 321}  14.25s
+[034] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 486}  7.02s
+[036] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 146, 'completion_tokens': 484}  7.28s
+[033] tenant=tenant-beta    priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 204, 'completion_tokens': 819}  9.79s
+[035] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 674}  9.03s
+[037] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 286}  8.55s
+[039] tenant=tenant-beta    priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 786}  8.73s
+[040] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 198, 'completion_tokens': 280}  9.67s
+[053] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[043] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 150, 'completion_tokens': 353}  9.15s
+[030] tenant=tenant-beta    priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 840}  18.09s
+[038] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 702}  14.12s
+[045] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 644}  12.19s
+[046] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 156, 'completion_tokens': 414}  12.72s
+[041] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 593}  17.01s
+[047] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 612}  13.51s
+[048] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 165, 'completion_tokens': 821}  13.11s
+[051] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 644}  13.80s
+[042] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 208}  18.76s
+[049] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 165, 'completion_tokens': 446}  15.18s
+[044] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 533}  19.37s
+[054] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 684}  13.50s
+[055] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 685}  12.02s
+[052] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 764}  14.77s
+[056] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 621}  10.69s
+[070] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[057] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 251}  10.99s
+[060] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 511}  9.35s
+[062] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 635}  10.82s
+[050] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 165, 'completion_tokens': 772}  24.16s
+[058] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 493}  16.04s
+[061] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 198, 'completion_tokens': 382}  15.80s
+[065] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 599}  12.89s
+[078] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[059] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 184, 'completion_tokens': 591}  17.91s
+[066] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 512}  14.87s
+[081] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[082] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[083] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[084] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[067] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 191, 'completion_tokens': 425}  13.64s
+[063] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 221}  17.18s
+[071] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 571}  15.44s
+[072] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 150, 'completion_tokens': 462}  15.23s
+[064] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 721}  21.65s
+[090] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 0, 'completion_tokens': 0}  0.00s
+[068] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 338}  19.35s
+[069] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 146, 'completion_tokens': 557}  20.77s
+[075] tenant=tenant-beta    priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 160, 'completion_tokens': 630}  13.85s
+[076] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 152, 'completion_tokens': 826}  13.42s
+[077] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 152, 'completion_tokens': 581}  11.54s
+[080] tenant=tenant-beta    priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 378}  12.58s
+[079] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 279}  12.87s
+[085] tenant=tenant-gamma   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 600}  11.35s
+[088] tenant=tenant-beta    priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 390}  10.62s
+[086] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 448}  13.41s
+[087] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 186, 'completion_tokens': 706}  12.65s
+[074] tenant=tenant-alpha   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 201, 'completion_tokens': 556}  21.60s
+[073] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 601}  24.22s
+[089] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 340}  12.51s
+[093] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 636}  8.74s
+[092] tenant=tenant-alpha   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 338}  10.61s
+[091] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 201, 'completion_tokens': 462}  11.24s
+[095] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 164, 'completion_tokens': 333}  9.50s
+[097] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 164, 'completion_tokens': 600}  8.90s
+[098] tenant=tenant-gamma   priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 144, 'completion_tokens': 338}  9.07s
+[099] tenant=tenant-beta    priority=normal  status=completed  has_result=True  tokens={'prompt_tokens': 154, 'completion_tokens': 713}  9.00s
+[094] tenant=tenant-gamma   priority=low     status=completed  has_result=True  tokens={'prompt_tokens': 162, 'completion_tokens': 436}  14.26s
+[096] tenant=tenant-alpha   priority=urgent  status=completed  has_result=True  tokens={'prompt_tokens': 148, 'completion_tokens': 485}  19.21s
+
+============================================================
+LOAD TEST SUMMARY
+============================================================
+Total requests:    100
+Completed:         100  (with result: 100, empty result: 0)
+Failed:            0
+Errors:            0
+
+Latency  P50=9.50s  P95=20.77s  P99=24.22s  Max=24.22s
+
+Token usage by tenant:
+  tenant-alpha: 43 tasks, prompt=5679 tokens, completion=17948 tokens
+  tenant-beta: 28 tasks, prompt=4344 tokens, completion=13743 tokens
+  tenant-gamma: 29 tasks, prompt=4351 tokens, completion=14202 tokens
+LOAD_END_EPOCH=1783096442

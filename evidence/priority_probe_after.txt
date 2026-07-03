@@ -1,0 +1,27 @@
+2026-07-03 18:50:12 CEST
+PROBE_START_EPOCH=1783097412
+
+Completion order (first finished → last):
+   1. urgent  urgent-7   elapsed=3.11s status=completed
+   2. urgent  urgent-1   elapsed=4.14s status=completed
+   3. urgent  urgent-4   elapsed=5.40s status=completed
+   4. urgent  urgent-2   elapsed=6.67s status=completed
+   5. urgent  urgent-5   elapsed=7.34s status=completed
+   6. urgent  urgent-0   elapsed=10.54s status=completed
+   7. urgent  urgent-6   elapsed=17.11s status=completed
+   8. urgent  urgent-3   elapsed=20.04s status=completed
+   9. low     low-2      elapsed=30.02s status=failed
+  10. low     low-0      elapsed=30.02s status=failed
+  11. low     low-6      elapsed=30.02s status=failed
+  12. low     low-5      elapsed=30.02s status=failed
+  13. low     low-4      elapsed=30.02s status=failed
+  14. low     low-3      elapsed=30.02s status=failed
+  15. low     low-1      elapsed=30.02s status=failed
+  16. low     low-7      elapsed=30.02s status=failed
+
+Average latency by priority (same tenant, urgent submitted AFTER low):
+  urgent avg = 9.30s
+  low    avg = 30.02s
+
+Mean completion rank  urgent=3.5 low=11.5  (lower = finished earlier)
+PROBE_END_EPOCH=1783097443

@@ -19,8 +19,19 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from src.models import Priority, TaskStatus, TaskResult
 from src.orchestrator import run_task, execution_log_size
-from src.config import MAX_CONCURRENT_TASKS, TASK_TIMEOUT_SECONDS
+from cachetools import TTLCache
+
+from src.config import (
+    MAX_CONCURRENT_TASKS,
+    MAX_CONCURRENT_TASKS_PER_TENANT,
+    TASK_TIMEOUT_SECONDS,
+    TASK_STORE_MAX_ENTRIES,
+    TASK_STORE_TTL_SECONDS,
+    RESPONSE_CACHE_MAX_ENTRIES,
+    RESPONSE_CACHE_TTL_SECONDS,
+)
 from src import telemetry
+from src.admission import PriorityAdmissionController
 from src.telemetry import (
     log,
     get_tracer,
@@ -52,25 +63,37 @@ FastAPIInstrumentor.instrument_app(app, excluded_urls="metrics,health")
 
 _tracer = get_tracer()
 
-# Task storage
-task_store: dict[str, TaskResult] = {}
+# Task storage.
+task_store: TTLCache[str, TaskResult] = TTLCache(
+    maxsize=TASK_STORE_MAX_ENTRIES, ttl=TASK_STORE_TTL_SECONDS,
+)
 
-# Response cache for repeated queries — avoids redundant LLM calls
-_response_cache: dict[str, dict] = {}
+# Response cache for repeated queries — avoids redundant LLM calls.
+_response_cache: TTLCache[str, dict] = TTLCache(
+    maxsize=RESPONSE_CACHE_MAX_ENTRIES, ttl=RESPONSE_CACHE_TTL_SECONDS,
+)
 
-# Limit concurrent task executions to protect downstream LLM service
-_task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+# Global ceiling on concurrent task executions (protects downstream LLM
+# service and bounds total in-flight cost across the whole service).
+_admission = PriorityAdmissionController(capacity=MAX_CONCURRENT_TASKS)
 
-# Ensure tasks for the same tenant execute in submission order
-# to prevent race conditions on downstream tenant state
-_tenant_locks: dict[str, asyncio.Lock] = {}
+# Per-tenant concurrency limiter.
+_tenant_semaphores: dict[str, asyncio.Semaphore] = {}
+
+
+def _get_tenant_semaphore(tenant_id: str) -> asyncio.Semaphore:
+    sem = _tenant_semaphores.get(tenant_id)
+    if sem is None:
+        sem = asyncio.Semaphore(MAX_CONCURRENT_TASKS_PER_TENANT)
+        _tenant_semaphores[tenant_id] = sem
+    return sem
 
 
 def _update_store_gauges() -> None:
     """Publish current in-memory store sizes so unbounded growth is visible."""
     STORE_ENTRIES.labels(store="task_store").set(len(task_store))
     STORE_ENTRIES.labels(store="response_cache").set(len(_response_cache))
-    STORE_ENTRIES.labels(store="tenant_locks").set(len(_tenant_locks))
+    STORE_ENTRIES.labels(store="tenant_semaphores").set(len(_tenant_semaphores))
     STORE_ENTRIES.labels(store="execution_log").set(execution_log_size())
 
 
@@ -136,16 +159,16 @@ async def create_task(body: CreateTaskBody):
         )
 
         async def _guarded_execute():
-            # Measure time spent queued (waiting on tenant lock + semaphore)
-            # separately from actual execution — this exposes head-of-line
-            # blocking caused by per-tenant serialisation under load.
+            # Measure time spent queued (waiting on the priority admission gate
+            # + per-tenant limiter) separately from actual execution — this is
+            # the head-of-line-blocking signal.
             queue_start = time.perf_counter()
+            tenant_sem = _get_tenant_semaphore(body.tenant_id)
             with _tracer.start_as_current_span("agent.queue_wait") as qspan:
                 qspan.set_attribute("tenant.id", body.tenant_id)
                 qspan.set_attribute("task.priority", body.priority.value)
-                lock = _tenant_locks.setdefault(body.tenant_id, asyncio.Lock())
-                async with lock:
-                    async with _task_semaphore:
+                async with _admission.slot(body.priority):
+                    async with tenant_sem:
                         wait_s = time.perf_counter() - queue_start
                         qspan.set_attribute("queue.wait_seconds", wait_s)
                         TASK_QUEUE_WAIT.labels(

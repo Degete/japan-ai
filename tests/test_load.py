@@ -15,7 +15,7 @@ import asyncio, httpx, random, time, sys
 BASE_URL = "http://localhost:8080"
 TENANTS = ["tenant-alpha", "tenant-beta", "tenant-gamma"]
 PRIORITIES = ["urgent", "normal", "low"]
-TOTAL_REQUESTS = 100
+TOTAL_REQUESTS = 300
 CONCURRENCY = 15
 
 TASK_TEMPLATES = [

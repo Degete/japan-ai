@@ -76,6 +76,12 @@ TASKS_IN_PROGRESS = Gauge(
     "Tasks currently executing (past the queue, doing real work).",
 )
 
+ADMISSION_QUEUE_DEPTH = Gauge(
+    "agent_admission_queue_depth",
+    "Tasks waiting in the priority admission queue, by priority.",
+    ["priority"],
+)
+
 # Stage-level (plan / tools / summarise / validate).
 STAGE_DURATION = Histogram(
     "agent_stage_duration_seconds",
@@ -110,6 +116,13 @@ LLM_RATE_LIMIT_WAIT = Histogram(
     buckets=(0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10),
 )
 
+LLM_RETRY_BACKOFF_WAIT = Histogram(
+    "agent_llm_retry_backoff_seconds",
+    "Total backoff sleep across a single LLM call's retries, by reason.",
+    ["stage", "reason"],
+    buckets=(0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 30),
+)
+
 # Token usage & cost — the FinOps view, sliced by tenant.
 TOKENS_TOTAL = Counter(
     "agent_tokens_total",
@@ -121,6 +134,12 @@ COST_USD_TOTAL = Counter(
     "agent_cost_usd_total",
     "Estimated LLM spend in USD, by tenant.",
     ["tenant"],
+)
+
+WASTED_TOKENS_TOTAL = Counter(
+    "agent_wasted_tokens_total",
+    "Estimated tokens burned on failed LLM attempts (not billable), by stage.",
+    ["stage"],
 )
 
 # In-memory store growth — surfaces unbounded-growth / leak issues.
