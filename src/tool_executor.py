@@ -2,28 +2,37 @@
 
 Each tool simulates an external service call (search engine,
 database, calculator, etc.) with realistic latency.
+
+Observability (added): each tool invocation runs inside a `tool.<name>` span
+so the per-tool latency is visible on the trace timeline.
 """
 
 import asyncio
 import random
 
+from src.telemetry import get_tracer
+
+_tracer = get_tracer()
+
 
 async def execute_tool(tool_name: str, args: dict) -> dict:
     """Execute a single tool and return its result."""
-    # Simulate variable latency per tool type
-    latency_map = {
-        "search": (0.1, 0.5),
-        "database_lookup": (0.05, 0.2),
-        "calculator": (0.01, 0.05),
-    }
-    low, high = latency_map.get(tool_name, (0.05, 0.3))
-    await asyncio.sleep(random.uniform(low, high))
+    with _tracer.start_as_current_span(f"tool.{tool_name}") as span:
+        span.set_attribute("tool.name", tool_name)
+        # Simulate variable latency per tool type
+        latency_map = {
+            "search": (0.1, 0.5),
+            "database_lookup": (0.05, 0.2),
+            "calculator": (0.01, 0.05),
+        }
+        low, high = latency_map.get(tool_name, (0.05, 0.3))
+        await asyncio.sleep(random.uniform(low, high))
 
-    return {
-        "tool": tool_name,
-        "status": "success",
-        "output": f"Result from {tool_name}",
-    }
+        return {
+            "tool": tool_name,
+            "status": "success",
+            "output": f"Result from {tool_name}",
+        }
 
 
 async def execute_tools(tools: list[tuple[str, dict]]) -> list[dict]:

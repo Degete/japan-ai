@@ -1,0 +1,75 @@
+# OpenTelemetry Collector configuration.
+#
+# Role in the pipeline:
+#   * Receives OTLP traces (gRPC 4317 / HTTP 4318) emitted by the agent-service.
+#   * Batches them and forwards to Tempo over OTLP/gRPC.
+#   * Also derives RED (Rate/Errors/Duration) span metrics via the
+#     `spanmetrics` connector and exposes them for Prometheus to scrape.
+#
+# Keeping the Collector in front of Tempo (rather than exporting straight
+# from the app) gives us a single, vendor-neutral seam where we can add
+# sampling, redaction, tail-based sampling, or fan-out later without
+# touching application code.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  # Ensure every span carries a service.name (defensive; the SDK sets it).
+  resource:
+    attributes:
+      - key: service.namespace
+        value: agent-platform
+        action: upsert
+
+connectors:
+  # Generates RED metrics (calls_total, duration histogram) from spans so we
+  # can graph latency/error-rate per service & span in Grafana even before
+  # adding bespoke Prometheus metrics.
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s, 30s]
+    dimensions:
+      - name: tenant.id
+      - name: task.priority
+      - name: stage
+      - name: llm.stage
+    metrics_flush_interval: 5s
+
+exporters:
+  # Traces -> Tempo (OTLP gRPC).
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Span-derived metrics -> exposed for Prometheus scrape.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/tempo, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      processors: [batch]
+      exporters: [prometheus]
+  telemetry:
+    logs:
+      level: info

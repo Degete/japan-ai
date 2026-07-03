@@ -1,0 +1,59 @@
+# Grafana datasource provisioning.
+#
+# Wires the three pillars together so a single trace can be explored with its
+# metrics and logs side by side:
+#   * Prometheus  — app metrics + span-derived RED metrics
+#   * Tempo       — distributed traces (with trace -> logs correlation)
+#   * Loki        — structured logs (with logs -> trace correlation)
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Trace -> Logs: click a span, jump to its logs in Loki matched by trace_id.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{service="agent-service"} | trace_id="$${__trace.traceId}"'
+      # Trace -> Metrics: jump from a span to RED metrics for that span.
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # Logs -> Trace: click the trace_id in a log line, open the trace in Tempo.
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+          urlDisplayLabel: 'View Trace'

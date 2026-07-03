@@ -2,3 +2,10 @@ fastapi==0.139.0
 uvicorn[standard]==0.49.0
 httpx==0.28.1
 pydantic==2.13.4
+prometheus-client==0.25.0
+opentelemetry-api==1.43.0
+opentelemetry-sdk==1.43.0
+opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-instrumentation-fastapi==0.64b0
+opentelemetry-instrumentation-httpx==0.64b0
+python-json-logger==4.1.0

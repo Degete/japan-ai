@@ -1,0 +1,84 @@
+// Grafana Alloy configuration — log collection pipeline.
+//
+// Alloy is the supported successor to Promtail (Promtail is EOL as of
+// 2026-03-02). It discovers Docker containers, tails their stdout/stderr,
+// parses the application's structured-JSON log lines, promotes trace_id /
+// span_id into Loki structured metadata (so Grafana can jump trace <-> logs),
+// and pushes everything to Loki.
+
+// ── Discover running Docker containers ──────────────────────────────
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Relabel: keep the container name and compose service as labels.
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+// ── Tail container logs ─────────────────────────────────────────────
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = { job = "docker" }
+  forward_to = [loki.process.app.receiver]
+}
+
+// ── Parse JSON logs & extract correlation IDs ───────────────────────
+loki.process "app" {
+  // Application lines are structured JSON. Parse them so we can pull out
+  // fields for labels and structured metadata.
+  stage.json {
+    expressions = {
+      level       = "level",
+      trace_id    = "trace_id",
+      span_id     = "span_id",
+      tenant_id   = "tenant_id",
+      task_id     = "task_id",
+      logger_name = "name",
+    }
+  }
+
+  // Low-cardinality fields become labels (safe to index).
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  // High-cardinality correlation IDs become structured metadata (queryable,
+  // not indexed as labels) — this is what powers trace <-> log pivoting.
+  stage.structured_metadata {
+    values = {
+      trace_id  = "",
+      span_id   = "",
+      tenant_id = "",
+      task_id   = "",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Ship to Loki ────────────────────────────────────────────────────
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// Expose Alloy's own UI/metrics on :12345 for debugging.
+logging {
+  level  = "info"
+  format = "logfmt"
+}

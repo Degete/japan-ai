@@ -1,0 +1,216 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "title": "Agent Platform — Overview",
+  "uid": "agent-platform-overview",
+  "tags": ["agent-platform"],
+  "timezone": "browser",
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "tenant",
+        "label": "Tenant",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(agent_tasks_total, tenant)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "priority",
+        "label": "Priority",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(agent_tasks_total, priority)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Golden Signals",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Task Rate (req/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum(rate(agent_tasks_total{tenant=~\"$tenant\",priority=~\"$priority\"}[1m]))", "legendFormat": "tasks/s" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Error Ratio",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 0.02 },
+            { "color": "red", "value": 0.05 }
+          ] }
+        }
+      },
+      "targets": [
+        { "expr": "sum(rate(agent_tasks_total{status=\"failed\",tenant=~\"$tenant\",priority=~\"$priority\"}[5m])) / clamp_min(sum(rate(agent_tasks_total{tenant=~\"$tenant\",priority=~\"$priority\"}[5m])), 0.0001)", "legendFormat": "error ratio" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Tasks In Progress",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "targets": [ { "expr": "agent_tasks_in_progress", "legendFormat": "in progress" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Cache Hit Ratio",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "expr": "sum(rate(agent_cache_events_total{result=\"hit\"}[5m])) / clamp_min(sum(rate(agent_cache_events_total[5m])), 0.0001)", "legendFormat": "hit ratio" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Task Duration Percentiles (p50/p95/p99)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(agent_task_duration_seconds_bucket{tenant=~\"$tenant\",priority=~\"$priority\"}[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_task_duration_seconds_bucket{tenant=~\"$tenant\",priority=~\"$priority\"}[5m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(agent_task_duration_seconds_bucket{tenant=~\"$tenant\",priority=~\"$priority\"}[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Task Outcomes by Status (rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "stacking": { "mode": "normal" } } } },
+      "targets": [
+        { "expr": "sum by (status) (rate(agent_tasks_total{tenant=~\"$tenant\",priority=~\"$priority\"}[1m]))", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Queue Wait / Head-of-Line Blocking",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Wait p95 by Tenant",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, tenant) (rate(agent_task_queue_wait_seconds_bucket[5m])))", "legendFormat": "{{tenant}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Wait p95 by Priority",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, priority) (rate(agent_task_queue_wait_seconds_bucket[5m])))", "legendFormat": "{{priority}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Pipeline Stages & LLM",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stage Duration p95 by Stage",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(agent_stage_duration_seconds_bucket[5m])))", "legendFormat": "{{stage}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM Calls by Stage (rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum by (stage) (rate(agent_llm_calls_total[1m]))", "legendFormat": "{{stage}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM Retries by Reason (rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum by (reason) (rate(agent_llm_retries_total[1m]))", "legendFormat": "{{reason}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM Rate-Limiter Wait p95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_llm_rate_limit_wait_seconds_bucket[5m])))", "legendFormat": "p95 wait" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Cost, Tokens & Resource Growth",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Estimated Cost USD by Tenant (cumulative)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } },
+      "targets": [
+        { "expr": "sum by (tenant) (agent_cost_usd_total)", "legendFormat": "{{tenant}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Token Rate by Tenant & Kind",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "sum by (tenant, kind) (rate(agent_tokens_total[1m]))", "legendFormat": "{{tenant}} / {{kind}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "In-Memory Store Sizes (unbounded-growth watch)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "agent_store_entries", "legendFormat": "{{store}}" }
+      ]
+    }
+  ]
+}

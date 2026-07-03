@@ -6,14 +6,51 @@ Provides the HTTP API for submitting and querying agent tasks.
 import uuid
 import time
 import asyncio
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
-from src.models import Priority, TaskStatus, TaskResult
-from src.orchestrator import run_task
-from src.config import MAX_CONCURRENT_TASKS, TASK_TIMEOUT_SECONDS
 
-app = FastAPI(title="Agent Execution Service")
+from opentelemetry import trace
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from src.models import Priority, TaskStatus, TaskResult
+from src.orchestrator import run_task, execution_log_size
+from src.config import MAX_CONCURRENT_TASKS, TASK_TIMEOUT_SECONDS
+from src import telemetry
+from src.telemetry import (
+    log,
+    get_tracer,
+    TASKS_TOTAL,
+    TASK_DURATION,
+    TASK_QUEUE_WAIT,
+    TASKS_IN_PROGRESS,
+    CACHE_EVENTS,
+    STORE_ENTRIES,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    telemetry.init_telemetry()
+    # Instrument httpx (used by llm_client) so outbound LLM calls appear as
+    # child CLIENT spans within each task trace.
+    HTTPXClientInstrumentor().instrument()
+    log.info("agent-service starting up")
+    yield
+    log.info("agent-service shutting down")
+
+
+app = FastAPI(title="Agent Execution Service", lifespan=lifespan)
+
+# Auto-instrument incoming HTTP requests. Exclude /metrics and /health from
+# tracing to avoid noise from scrapers/health-checks.
+FastAPIInstrumentor.instrument_app(app, excluded_urls="metrics,health")
+
+_tracer = get_tracer()
 
 # Task storage
 task_store: dict[str, TaskResult] = {}
@@ -27,6 +64,14 @@ _task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 # Ensure tasks for the same tenant execute in submission order
 # to prevent race conditions on downstream tenant state
 _tenant_locks: dict[str, asyncio.Lock] = {}
+
+
+def _update_store_gauges() -> None:
+    """Publish current in-memory store sizes so unbounded growth is visible."""
+    STORE_ENTRIES.labels(store="task_store").set(len(task_store))
+    STORE_ENTRIES.labels(store="response_cache").set(len(_response_cache))
+    STORE_ENTRIES.labels(store="tenant_locks").set(len(_tenant_locks))
+    STORE_ENTRIES.labels(store="execution_log").set(execution_log_size())
 
 
 class CreateTaskBody(BaseModel):
@@ -51,58 +96,131 @@ class TaskResponse(BaseModel):
 async def create_task(body: CreateTaskBody):
     task_id = str(uuid.uuid4())
 
-    # Cache key: tenant + description (priority excluded because
-    # task results are priority-independent in the current design)
-    cache_key = f"{body.tenant_id}:{body.task_description}"
-    if cache_key in _response_cache:
-        cached = _response_cache[cache_key]
-        result = TaskResult(
-            task_id=task_id, status=TaskStatus.COMPLETED,
+    with _tracer.start_as_current_span("agent.task") as task_span:
+        task_span.set_attribute("agent.task_id", task_id)
+        task_span.set_attribute("tenant.id", body.tenant_id)
+        task_span.set_attribute("task.priority", body.priority.value)
+        task_span.set_attribute("task.description", body.task_description)
+
+        # Cache key: tenant + description (priority excluded because
+        # task results are priority-independent in the current design)
+        cache_key = f"{body.tenant_id}:{body.task_description}"
+        if cache_key in _response_cache:
+            task_span.set_attribute("cache.hit", True)
+            CACHE_EVENTS.labels(result="hit").inc()
+            cached = _response_cache[cache_key]
+            result = TaskResult(
+                task_id=task_id, status=TaskStatus.COMPLETED,
+                tenant_id=body.tenant_id, priority=body.priority,
+                result=cached.get("result"),
+                token_usage={"prompt_tokens": 0, "completion_tokens": 0},
+                created_at=time.time(), completed_at=time.time(),
+            )
+            task_store[task_id] = result
+            TASKS_TOTAL.labels(body.tenant_id, body.priority.value, "completed").inc()
+            _update_store_gauges()
+            log.info(
+                "task served from cache",
+                extra={"task_id": task_id, "tenant_id": body.tenant_id,
+                       "priority": body.priority.value},
+            )
+            return _to_response(result)
+
+        task_span.set_attribute("cache.hit", False)
+        CACHE_EVENTS.labels(result="miss").inc()
+
+        # Execute the task (bounded by concurrency limit)
+        task_store[task_id] = TaskResult(
+            task_id=task_id, status=TaskStatus.PENDING,
             tenant_id=body.tenant_id, priority=body.priority,
-            result=cached.get("result"),
-            token_usage={"prompt_tokens": 0, "completion_tokens": 0},
-            created_at=time.time(), completed_at=time.time(),
         )
+
+        async def _guarded_execute():
+            # Measure time spent queued (waiting on tenant lock + semaphore)
+            # separately from actual execution — this exposes head-of-line
+            # blocking caused by per-tenant serialisation under load.
+            queue_start = time.perf_counter()
+            with _tracer.start_as_current_span("agent.queue_wait") as qspan:
+                qspan.set_attribute("tenant.id", body.tenant_id)
+                qspan.set_attribute("task.priority", body.priority.value)
+                lock = _tenant_locks.setdefault(body.tenant_id, asyncio.Lock())
+                async with lock:
+                    async with _task_semaphore:
+                        wait_s = time.perf_counter() - queue_start
+                        qspan.set_attribute("queue.wait_seconds", wait_s)
+                        TASK_QUEUE_WAIT.labels(
+                            body.tenant_id, body.priority.value
+                        ).observe(wait_s)
+                        TASKS_IN_PROGRESS.inc()
+                        try:
+                            return await run_task(
+                                task_id=task_id,
+                                description=body.task_description,
+                                tenant_id=body.tenant_id,
+                                priority=body.priority,
+                            )
+                        finally:
+                            TASKS_IN_PROGRESS.dec()
+
+        # Enforce task-level deadline: clients should not wait indefinitely
+        exec_start = time.perf_counter()
+        timed_out = False
+        try:
+            result = await asyncio.wait_for(
+                _guarded_execute(), timeout=TASK_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            timed_out = True
+            result = TaskResult(
+                task_id=task_id, status=TaskStatus.FAILED,
+                tenant_id=body.tenant_id, priority=body.priority,
+                error="Task execution exceeded time limit",
+                token_usage={"prompt_tokens": 0, "completion_tokens": 0},
+                created_at=time.time(), completed_at=time.time(),
+            )
+        exec_elapsed = time.perf_counter() - exec_start
+
         task_store[task_id] = result
+        task_span.set_attribute("task.status", result.status.value)
+        task_span.set_attribute("task.timed_out", timed_out)
+
+        TASKS_TOTAL.labels(
+            body.tenant_id, body.priority.value, result.status.value
+        ).inc()
+        TASK_DURATION.labels(
+            body.tenant_id, body.priority.value, result.status.value
+        ).observe(exec_elapsed)
+
+        if timed_out:
+            task_span.set_status(trace.Status(trace.StatusCode.ERROR,
+                                              "task timed out"))
+            log.warning(
+                "task timed out",
+                extra={"task_id": task_id, "tenant_id": body.tenant_id,
+                       "priority": body.priority.value,
+                       "elapsed_s": round(exec_elapsed, 3)},
+            )
+        elif result.status == TaskStatus.FAILED:
+            log.error(
+                "task failed",
+                extra={"task_id": task_id, "tenant_id": body.tenant_id,
+                       "priority": body.priority.value,
+                       "error": (result.error or "")[:200]},
+            )
+        else:
+            log.info(
+                "task completed",
+                extra={"task_id": task_id, "tenant_id": body.tenant_id,
+                       "priority": body.priority.value,
+                       "elapsed_s": round(exec_elapsed, 3)},
+            )
+
+        # Cache successful responses for future identical requests
+        if result.status == TaskStatus.COMPLETED:
+            _response_cache[cache_key] = {"result": result.result}
+
+        _update_store_gauges()
         return _to_response(result)
-
-    # Execute the task (bounded by concurrency limit)
-    task_store[task_id] = TaskResult(
-        task_id=task_id, status=TaskStatus.PENDING,
-        tenant_id=body.tenant_id, priority=body.priority,
-    )
-
-    async def _guarded_execute():
-        lock = _tenant_locks.setdefault(body.tenant_id, asyncio.Lock())
-        async with lock:
-            async with _task_semaphore:
-                return await run_task(
-                    task_id=task_id,
-                    description=body.task_description,
-                    tenant_id=body.tenant_id,
-                    priority=body.priority,
-                )
-
-    # Enforce task-level deadline: clients should not wait indefinitely
-    try:
-        result = await asyncio.wait_for(
-            _guarded_execute(), timeout=TASK_TIMEOUT_SECONDS,
-        )
-    except asyncio.TimeoutError:
-        result = TaskResult(
-            task_id=task_id, status=TaskStatus.FAILED,
-            tenant_id=body.tenant_id, priority=body.priority,
-            error="Task execution exceeded time limit",
-            token_usage={"prompt_tokens": 0, "completion_tokens": 0},
-            created_at=time.time(), completed_at=time.time(),
-        )
-    task_store[task_id] = result
-
-    # Cache successful responses for future identical requests
-    if result.status == TaskStatus.COMPLETED:
-        _response_cache[cache_key] = {"result": result.result}
-
-    return _to_response(result)
 
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -115,6 +233,12 @@ async def get_task(task_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus scrape endpoint."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 def _to_response(r: TaskResult) -> TaskResponse:
