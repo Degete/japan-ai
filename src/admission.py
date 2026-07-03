@@ -1,4 +1,4 @@
-"""Priority-aware admission control.
+"""Priority-aware admission control (with aging).
 
 FIX (Issue #2): the original service accepted a `priority` (urgent/normal/low)
 but never scheduled on it — admission was plain FIFO, so an `urgent` request
@@ -6,25 +6,36 @@ could sit behind a batch of `low` ones (priority inversion).
 
 `asyncio.Semaphore` alone cannot fix this: when a slot frees, it wakes waiters
 in roughly arrival order, ignoring priority. This controller replaces the plain
-global semaphore with a **priority queue** in front of a fixed number of slots:
+global semaphore with a priority queue in front of a fixed number of slots:
 
   * Up to `capacity` tasks run concurrently (same global budget as before).
-  * When full, waiters are ordered by (priority_rank, submission_seq):
-      - higher priority is admitted first;
-      - within the same priority it stays FIFO (no reordering ⇒ no starvation
-        of same-priority tasks, and fairness is preserved).
+  * When full, the waiter admitted next is the one with the best *effective
+    score*.
 
-The controller also publishes queue depth per priority so Grafana can show that
-urgent work is genuinely jumping the queue.
+AGING (mitigation for the strict-priority starvation trade-off):
+  Strict priority (urgent always before low) can starve `low` under sustained
+  load. To bound that, a waiter's effective score improves the longer it waits:
+
+      score = base_rank - (wait_seconds / aging_interval)
+
+  Lower score wins. A LOW task (rank 2) overtakes a freshly-arrived URGENT task
+  (rank 0) once it has aged past a 2-rank gap — i.e. after ~2·aging_interval
+  seconds. This keeps urgent fast in the common case while guaranteeing low
+  makes forward progress. Ties break by submission order (FIFO). Set the aging
+  interval to 0 to fall back to strict priority.
+
+The controller publishes queue depth per priority so Grafana can show both that
+urgent normally jumps the queue and that aged low tasks eventually get admitted.
 """
 
 from __future__ import annotations
 
 import asyncio
-import heapq
 import itertools
+import time
 
 from src.models import Priority
+from src.config import PRIORITY_AGING_INTERVAL_SECONDS
 from src.telemetry import ADMISSION_QUEUE_DEPTH
 
 # Lower rank = admitted sooner.
@@ -35,15 +46,35 @@ _PRIORITY_RANK: dict[Priority, int] = {
 }
 
 
-class PriorityAdmissionController:
-    """A capacity-bounded gate that admits waiters in priority order."""
+class _Waiter:
+    __slots__ = ("priority", "rank", "seq", "enqueued_at", "future")
 
-    def __init__(self, capacity: int):
+    def __init__(self, priority: Priority, rank: int, seq: int,
+                 future: asyncio.Future):
+        self.priority = priority
+        self.rank = rank
+        self.seq = seq
+        self.enqueued_at = time.monotonic()
+        self.future = future
+
+    def effective_score(self, now: float, aging_interval: float) -> float:
+        """Lower is better. Base rank improved by how long we've waited."""
+        if aging_interval > 0:
+            aged = (now - self.enqueued_at) / aging_interval
+        else:
+            aged = 0.0
+        return self.rank - aged
+
+
+class PriorityAdmissionController:
+    """A capacity-bounded gate that admits waiters by aged priority order."""
+
+    def __init__(self, capacity: int,
+                 aging_interval: float = PRIORITY_AGING_INTERVAL_SECONDS):
         self._capacity = capacity
+        self._aging_interval = aging_interval
         self._in_use = 0
-        # Heap of (rank, seq, future, priority). `seq` breaks ties in FIFO
-        # order and keeps heap items unique/comparable.
-        self._waiters: list[tuple[int, int, asyncio.Future, Priority]] = []
+        self._waiters: list[_Waiter] = []
         self._seq = itertools.count()
         self._lock = asyncio.Lock()
         self._depth: dict[Priority, int] = {p: 0 for p in Priority}
@@ -52,19 +83,39 @@ class PriorityAdmissionController:
         for p, n in self._depth.items():
             ADMISSION_QUEUE_DEPTH.labels(p.value).set(n)
 
+    def _pop_best(self) -> _Waiter | None:
+        """Remove and return the waiter with the best (lowest) effective score.
+
+        The backlog is bounded by the concurrency overflow, so a linear scan is
+        cheap and lets us apply the time-dependent aging score at selection
+        time (a static heap key cannot age)."""
+        if not self._waiters:
+            return None
+        now = time.monotonic()
+        best_i = 0
+        best_key = (
+            self._waiters[0].effective_score(now, self._aging_interval),
+            self._waiters[0].seq,
+        )
+        for i in range(1, len(self._waiters)):
+            w = self._waiters[i]
+            key = (w.effective_score(now, self._aging_interval), w.seq)
+            if key < best_key:
+                best_key = key
+                best_i = i
+        return self._waiters.pop(best_i)
+
     async def acquire(self, priority: Priority) -> None:
-        """Block until a slot is free, honouring priority ordering."""
+        """Block until a slot is free, honouring aged priority ordering."""
         async with self._lock:
             if self._in_use < self._capacity:
                 # Fast path: capacity available, admit immediately.
                 self._in_use += 1
                 return
-            # Slow path: enqueue and wait to be woken in priority order.
+            # Slow path: enqueue and wait to be woken.
             fut: asyncio.Future = asyncio.get_event_loop().create_future()
             rank = _PRIORITY_RANK.get(priority, 1)
-            heapq.heappush(
-                self._waiters, (rank, next(self._seq), fut, priority)
-            )
+            self._waiters.append(_Waiter(priority, rank, next(self._seq), fut))
             self._depth[priority] += 1
             self._publish_depth()
 
@@ -72,15 +123,15 @@ class PriorityAdmissionController:
         await fut
 
     async def release(self, priority: Priority) -> None:
-        """Return a slot; wake the highest-priority waiter, if any."""
+        """Return a slot; wake the best (aged-priority) waiter, if any."""
         async with self._lock:
-            if self._waiters:
-                _, _, fut, wp = heapq.heappop(self._waiters)
-                self._depth[wp] -= 1
+            waiter = self._pop_best()
+            if waiter is not None:
+                self._depth[waiter.priority] -= 1
                 self._publish_depth()
                 # Slot stays "in use": it transfers to the woken waiter.
-                if not fut.done():
-                    fut.set_result(None)
+                if not waiter.future.done():
+                    waiter.future.set_result(None)
                 else:
                     # Waiter was cancelled; reclaim the slot.
                     self._in_use -= 1

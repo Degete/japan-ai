@@ -1,0 +1,18 @@
+2026-07-04 01:02:55 CEST
+=== Priority aging (Fix #2 mitigation) ===
+
+[STRICT priority (aging OFF)] aging_interval=0.0s
+  admission order: urgent-0 urgent-1 urgent-2 urgent-3 urgent-4 urgent-5 urgent-6 urgent-7 urgent-8 urgent-9 low-0 low-1 low-2
+  LOW admitted at positions [10, 11, 12] of 13
+  mean LOW position: 11.0  (lower = earlier / less starved)
+
+[AGED priority (aging ON)] aging_interval=0.25s
+  admission order: urgent-0 urgent-1 urgent-2 urgent-3 urgent-4 low-0 low-1 low-2 urgent-5 urgent-6 urgent-7 urgent-8 urgent-9
+  LOW admitted at positions [5, 6, 7] of 13
+  mean LOW position: 6.0  (lower = earlier / less starved)
+
+Summary:
+  strict: LOW positions [10, 11, 12] (mean 11.0) → starved to the back
+  aged  : LOW positions [5, 6, 7] (mean 6.0) → interleaved earlier
+
+  RESULT: aging moved LOW earlier: PASS

@@ -1,0 +1,25 @@
+2026-07-04 01:03:36 CEST
+
+Completion order (first finished → last):
+   1. urgent  urgent-6   elapsed=3.56s status=completed
+   2. urgent  urgent-4   elapsed=3.69s status=completed
+   3. urgent  urgent-1   elapsed=4.42s status=completed
+   4. urgent  urgent-3   elapsed=5.28s status=completed
+   5. urgent  urgent-0   elapsed=5.60s status=completed
+   6. urgent  urgent-2   elapsed=6.74s status=completed
+   7. urgent  urgent-5   elapsed=9.48s status=completed
+   8. urgent  urgent-7   elapsed=11.94s status=completed
+   9. low     low-0      elapsed=16.94s status=completed
+  10. low     low-4      elapsed=18.99s status=completed
+  11. low     low-7      elapsed=20.63s status=completed
+  12. low     low-5      elapsed=21.11s status=completed
+  13. low     low-1      elapsed=22.50s status=completed
+  14. low     low-3      elapsed=24.35s status=completed
+  15. low     low-6      elapsed=26.29s status=completed
+  16. low     low-2      elapsed=30.02s status=failed
+
+Average latency by priority (same tenant, urgent submitted AFTER low):
+  urgent avg = 6.34s
+  low    avg = 22.60s
+
+Mean completion rank  urgent=3.5 low=11.5  (lower = finished earlier)

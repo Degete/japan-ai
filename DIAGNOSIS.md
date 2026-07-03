@@ -345,6 +345,63 @@ Exports: `evidence/loadtest_step2_fix2.txt`,
 `evidence/metrics_snapshot_step2_fix2.txt`,
 `evidence/priority_probe_after.txt`.
 
+### Mitigation implemented: priority aging (bounds the starvation)
+
+I took the "aging" option described above so `low` no longer fully starves while
+keeping urgent fast in the common case.
+
+`src/admission.py` now scores each waiter as:
+
+```
+effective_score = base_rank - (wait_seconds / PRIORITY_AGING_INTERVAL_SECONDS)
+```
+
+(lower wins; ties break FIFO by submission order). A `LOW` waiter (rank 2)
+overtakes a freshly-arrived `URGENT` (rank 0) once it has aged past the 2-rank
+gap — ~2·interval seconds. With `PRIORITY_AGING_INTERVAL_SECONDS = 5` that is
+~10 s, comfortably inside the 30 s deadline. Because the score is time-dependent
+the controller now selects the best waiter with a short linear scan at release
+time (a static heap key cannot age). Set the interval to 0 to fall back to
+strict priority.
+
+**Controlled aging probe (`tests/aging_probe.py`)** — 3 LOW waiters under
+continuous URGENT pressure, capacity 1:
+
+| Policy | LOW admission positions (of 13) | mean |
+| ------ | ------------------------------- | ---- |
+| Strict (aging OFF) | 10, 11, 12 — **dead last** | 11.0 |
+| **Aged (aging ON)** | **5, 6, 7 — interleaved** | **6.0** |
+
+**End-to-end probe (`tests/priority_probe.py`)** — 8 LOW submitted first, then 8
+URGENT, under saturation, same tenant:
+
+| Policy | urgent | low |
+| ------ | ------ | --- |
+| Strict priority (before) | 8 completed | **8 FAILED** (all 30 s timeouts) |
+| **Aged (after)** | 8 completed (avg 6.3 s) | **7 completed + 1 failed** (avg 22.6 s) |
+
+Urgent still finishes first; `low` now makes forward progress and mostly
+completes instead of universally timing out.
+
+**Grafana — Queue Wait p95 by priority & Admission Queue Depth** (windowed
+`1783119859000`–`1783120019000`):
+
+![Aging: queue wait & depth](docs/screenshots/step2_aging/01_queue_wait_and_depth.png)
+
+The `low` (green) queue-wait p95 line now **trends downward** (30 s → ~18 s)
+instead of being pinned at the timeout wall, and the admission-queue depth for
+`low` oscillates and drains rather than growing without bound — aged `low` tasks
+are being pulled through.
+
+**Position (updated):** strict priority is a fine default, but unbounded `low`
+starvation is rarely acceptable in practice, so aging (on by default here) is the
+better production choice — it preserves urgent latency in the common case while
+guaranteeing `low` forward progress. The aging interval is the single knob that
+trades urgent-tail latency against low-starvation resistance.
+
+Exports: `evidence/aging_probe.txt`, `evidence/priority_probe_aging.txt`,
+`evidence/loadtest_step2_aging.txt`, `evidence/metrics_snapshot_step2_aging.txt`.
+
 ---
 
 ## Issue #3 — Redundant `validate` LLM call whose result is discarded (High)
